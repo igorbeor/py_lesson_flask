@@ -12,9 +12,9 @@ import json
 from flaskr.auth.auth import auth
 from flaskr.db import get_db
 from flaskr.auth.queries import get_user_by_username
-from flaskr.blog.queries import (
-    create_post, delete_post, get_post, update_post, post_list
-)
+from flaskr.blog.queries import ( create_post, delete_post, get_post,
+    post_list, update_post, create_comment, delete_comment, comment_list,
+    get_comment, update_comment )
 
 bp = Blueprint("blog", __name__)
 
@@ -46,6 +46,35 @@ def check_post(id, check_author=True):
         abort(403)
 
     return post
+
+def check_comment(id, check_author=True):
+    """Get a comment, its author and post by id.
+
+    Checks that the id exists and optionally that the current user is
+    the author.
+
+    :param id: id of comment to get
+    :param check_author: require the current user to be the author
+    :return: the comment with author and post information
+    :raise 404: if a comment with the given id doesn't exist
+    :raise 403: if the current user isn't the author
+    """
+
+    comment = get_comment(get_db(), id)
+
+    if comment is None:
+        abort(404, "Comment id {0} doesn't exist.".format(id))
+
+    username = auth.username()
+    user = get_user_by_username(get_db(), username)
+
+    if not user:
+        abort(403)
+
+    if check_author and comment["author_id"] != user["id"]:
+        abort(403)
+
+    return comment
 
 
 @bp.route("/posts", methods=["GET", "POST"])
@@ -163,6 +192,124 @@ def post():
         db = get_db()
         delete_post(db, id)
         message = json.dumps({'message': 'Post id {0} delete successfully'.format(id)})
+        return Response(
+            message,
+            status=200,
+            mimetype="application/json"
+        )
+
+@bp.route("/posts/<int:post_id>/comments", methods=["GET", "POST"])
+@auth.login_required
+def comment_list():
+    db = get_db()
+    error = None
+
+    # get all comments
+    if request.method == "GET":
+        comments = comment_list(db)
+
+        if not comments:
+            error = json.dumps({"error": "No comments available."})
+        if error:
+            return Response(
+                error,
+                status=404,
+                mimetype="application/json"
+            )
+
+        data = json.dumps([dict(comment) for comment in comments])
+        return Response(
+            data,
+            status=200,
+            mimetype="application/json"
+        )
+    
+    # create new comment
+    elif request.method == "POST":
+        data = request.get_json()
+        body = data.get('body', '')
+
+        if not body:
+            error = json.dumps({"error": "Body is required"})
+        if error:
+            return Response(
+                error,
+                status=400,
+                mimetype="application/json"
+            )
+
+        db = get_db()
+        username = auth.username()
+        user = get_user_by_username(username)
+        create_comment(db, body, user["id"])
+        data = json.dumps({'body': body, 'post_id': post_id,
+                           'author_id': user["id"]})
+        return Response(
+            data,
+            status=201,
+            mimetype="application/json"
+        )
+
+    error = json.dumps({"error": 'Unknown method'})
+    return Response(
+        error,
+        stauts=405,
+        mimetype="application/json"
+    )
+
+@bp.route('/posts/<int:post_id/comments/<int:id>', methods=["GET", "PUT", "DELETE"])
+@auth.login_required
+def comment():
+    comment = check_comment(id)
+    error = None
+
+    # comment with id does not exist
+    if not comment:
+        error = json.dumps({"error": "Comment id {0} not available.".format(id)})
+    if error:
+        return Response(
+            error,
+            status=404,
+            mimetype="application/json"
+        )
+
+    # get comment by id
+    if request.method == "GET":
+        data = json.dumps(dict(comment))
+        return Response(
+            data,
+            status=200,
+            mimetype="application/json"
+        )
+
+    # update comment by id
+    elif request.method == "PUT":
+        data = request.get_json()
+        body = data.get('body', '')
+
+        if not body:
+            error = json.dumps({"error": "Body is required"})
+        if error:
+            return Response(
+                error,
+                status=400,
+                mimetype="application/json"
+            )
+
+        db = get_db()
+        update_comment(db, body, id)
+        message = json.dumps({'message': 'Comment id {0} update successfully'.format(id)})
+        return Response(
+            message,
+            status=200,
+            mimetype="application/json"
+        )
+    
+    # delete comment by id
+    elif request.method == "DELETE":
+        db = get_db()
+        delete_comment(db, id)
+        message = json.dumps({'message': 'Comment id {0} delete successfully'.format(id)})
         return Response(
             message,
             status=200,
