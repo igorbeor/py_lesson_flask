@@ -35,3 +35,40 @@ def update_post(db, title, body, id):
 def delete_post(db, id):
     db.execute("DELETE FROM post WHERE id = ?", (id,))
     db.commit()
+
+def comment_list(db):
+    return db.execute(
+        "SELECT c.id, c.body, c.created, c.author_id, c.post_id, u.username"
+        " FROM comment c JOIN user u ON c.author_id = u.id"
+        " ORDER BY c.created"
+    ).fetchall()
+
+
+def get_comment(db, id):
+    return db.execute(
+            "SELECT c.id, c.body, c.created, c.author_id, c.post_id, u.username"
+            " FROM comment c JOIN user u ON c.author_id = u.id"
+            " WHERE c.id = ?",
+            (id,),
+        ).fetchone()
+
+
+def create_comment(db, body, author_id, post_id):
+    db.execute(
+        "INSERT INTO post (body, author_id, post_id) VALUES (?, ?, ?)",
+        (body, author_id, post_id),
+    )
+    db.commit()
+
+
+def update_comment(db, body, id):
+    db.execute(
+        "UPDATE post SET body = ? WHERE id = ?"
+        (body, id)
+    )
+    db.commit()
+
+
+def delete_comment(db, id):
+    db.execute("DELETE FROM comment WHERE id = ?", (id,))
+    db.commit()
