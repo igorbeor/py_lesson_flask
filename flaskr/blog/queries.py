@@ -1,6 +1,6 @@
 
 
-def post_list(db):
+def posts_list(db):
     return db.execute(
         "SELECT p.id, p.title, p.body, p.created, p.author_id, u.username"
         " FROM post p JOIN user u ON p.author_id = u.id"
@@ -26,7 +26,7 @@ def create_post(db, title, body, author_id):
 
 def update_post(db, title, body, id):
     db.execute(
-        "UPDATE post SET title = ?, body = ? WHERE id = ?"
+        "UPDATE post SET title = ?, body = ? WHERE id = ?",
         (title, body, id)
     )
     db.commit()
@@ -36,7 +36,7 @@ def delete_post(db, id):
     db.execute("DELETE FROM post WHERE id = ?", (id,))
     db.commit()
 
-def comment_list(db):
+def comments_list(db):
     return db.execute(
         "SELECT c.id, c.body, c.created, c.author_id, c.post_id, u.username"
         " FROM comment c JOIN user u ON c.author_id = u.id"
@@ -55,7 +55,7 @@ def get_comment(db, id):
 
 def create_comment(db, body, author_id, post_id):
     db.execute(
-        "INSERT INTO post (body, author_id, post_id) VALUES (?, ?, ?)",
+        "INSERT INTO comment (body, author_id, post_id) VALUES (?, ?, ?)",
         (body, author_id, post_id),
     )
     db.commit()
@@ -63,7 +63,7 @@ def create_comment(db, body, author_id, post_id):
 
 def update_comment(db, body, id):
     db.execute(
-        "UPDATE post SET body = ? WHERE id = ?"
+        "UPDATE comment SET body = ? WHERE id = ?",
         (body, id)
     )
     db.commit()

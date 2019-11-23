@@ -11,9 +11,9 @@ import json
 
 from flaskr.auth.auth import auth
 from flaskr.db import get_db
-from flaskr.auth.queries import get_user_by_username
+from flaskr.auth.queries import get_user_by_id, get_user_by_username
 from flaskr.blog.queries import ( create_post, delete_post, get_post,
-    post_list, update_post, create_comment, delete_comment, comment_list,
+    posts_list, update_post, create_comment, delete_comment, comments_list,
     get_comment, update_comment )
 
 bp = Blueprint("blog", __name__)
@@ -85,8 +85,8 @@ def post_list():
 
     # get all posts
     if request.method == "GET":
-        posts = post_list(db)
-
+        posts = list(posts_list(db))
+        
         if not posts:
             error = json.dumps({"error": "No posts available."})
         if error:
@@ -95,8 +95,13 @@ def post_list():
                 status=404,
                 mimetype="application/json"
             )
+        data = list()
+        for post in posts:
+            post = dict(post)
+            post['created'] = post['created'].strftime("%d-%b-%Y (%H:%M:%S)")
+            data.append(post)
 
-        data = json.dumps([dict(post) for post in posts])
+        data = json.dumps(data)
         return Response(
             data,
             status=200,
@@ -140,8 +145,8 @@ def post_list():
 
 @bp.route('/posts/<int:id>', methods=["GET", "PUT", "DELETE"])
 @auth.login_required
-def post():
-    post = check_post(id)
+def post(id):
+    post = dict(check_post(id))
     error = None
 
     # post with id does not exist
@@ -156,6 +161,7 @@ def post():
 
     # get post by id
     if request.method == "GET":
+        post['created'] = post['created'].strftime("%d-%b-%Y (%H:%M:%S)")
         data = json.dumps(dict(post))
         return Response(
             data,
@@ -200,13 +206,13 @@ def post():
 
 @bp.route("/posts/<int:post_id>/comments", methods=["GET", "POST"])
 @auth.login_required
-def comment_list():
+def comment_list(post_id):
     db = get_db()
     error = None
 
     # get all comments
     if request.method == "GET":
-        comments = comment_list(db)
+        comments = list(comments_list(db))
 
         if not comments:
             error = json.dumps({"error": "No comments available."})
@@ -217,7 +223,13 @@ def comment_list():
                 mimetype="application/json"
             )
 
-        data = json.dumps([dict(comment) for comment in comments])
+        data = list()
+        for comment in comments:
+            comment = dict(comment)
+            comment['created'] = comment['created'].strftime("%d-%b-%Y (%H:%M:%S)")
+            data.append(comment)
+
+        data = json.dumps(data)
         return Response(
             data,
             status=200,
@@ -241,7 +253,7 @@ def comment_list():
         db = get_db()
         username = auth.username()
         user = get_user_by_username(username)
-        create_comment(db, body, user["id"])
+        create_comment(db, body, user["id"], post_id)
         data = json.dumps({'body': body, 'post_id': post_id,
                            'author_id': user["id"]})
         return Response(
@@ -257,10 +269,10 @@ def comment_list():
         mimetype="application/json"
     )
 
-@bp.route('/posts/<int:post_id/comments/<int:id>', methods=["GET", "PUT", "DELETE"])
+@bp.route('/posts/<int:post_id>/comments/<int:id>', methods=["PUT", "DELETE"])
 @auth.login_required
-def comment():
-    comment = check_comment(id)
+def comment(post_id, id):
+    comment = dict(check_comment(id))
     error = None
 
     # comment with id does not exist
@@ -275,6 +287,7 @@ def comment():
 
     # get comment by id
     if request.method == "GET":
+        comment['created'] = comment['created'].strftime("%d-%b-%Y (%H:%M:%S)")
         data = json.dumps(dict(comment))
         return Response(
             data,
